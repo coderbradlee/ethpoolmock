@@ -15,7 +15,7 @@ const (
 	MaxReqSize = 1024
 	headerHash = "645cf20198c2f3861e947d4f67e3ab63b7b2e24dcc9095bd9123e7b33371f6cc"
 	seedHash   = "abad8f99f3918bf903c6a909d9bbc0fdfa5a2f4b9cb1196175ec825c6610126c"
-	diff       = "2181977828349372"
+	diff       = "21819778283493"
 )
 
 type ProxyServer struct {
