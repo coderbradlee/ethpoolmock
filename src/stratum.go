@@ -13,6 +13,9 @@ import (
 
 const (
 	MaxReqSize = 1024
+	headerHash = "645cf20198c2f3861e947d4f67e3ab63b7b2e24dcc9095bd9123e7b33371f6cc"
+	seedHash   = "abad8f99f3918bf903c6a909d9bbc0fdfa5a2f4b9cb1196175ec825c6610126c"
+	diff       = "2181977828349372"
 )
 
 type ProxyServer struct {
@@ -206,7 +209,7 @@ func (s *ProxyServer) removeSession(cs *Session) {
 }
 
 func (s *ProxyServer) broadcastNewJobs() {
-	reply := []string{"645cf20198c2f3861e947d4f67e3ab63b7b2e24dcc9095bd9123e7b33371f6cc", "abad8f99f3918bf903c6a909d9bbc0fdfa5a2f4b9cb1196175ec825c6610126c", "2000"}
+	reply := []string{seedHash, headerHash, diff}
 
 	s.sessionsMu.RLock()
 	defer s.sessionsMu.RUnlock()
