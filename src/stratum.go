@@ -4,36 +4,50 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
-	"log"
 	"net"
+	"sync"
 	"time"
-
-	"util"
 )
 
 const (
 	MaxReqSize = 1024
 )
 
-func (s *ProxyServer) ListenTCP() {
-	timeout := util.MustParseDuration(s.config.Stratum.Timeout)
-	s.timeout = timeout
+type ProxyServer struct {
+	sessionsMu sync.RWMutex
+	sessions   map[*Session]struct{}
+}
 
-	addr, err := net.ResolveTCPAddr("tcp", s.config.Stratum.Listen)
+type Session struct {
+	ip  string
+	enc *json.Encoder
+	sync.Mutex
+	conn  *net.TCPConn
+	login string
+}
+
+func NewProxy() {
+	proxy := &ProxyServer{}
+	proxy.sessions = make(map[*Session]struct{})
+	proxy.ListenTCP()
+}
+
+func (s *ProxyServer) ListenTCP() {
+	addr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:8080")
 	if err != nil {
-		log.Fatalf("Error: %v", err)
+		fmt.Printf("Error: %v", err)
 	}
 	server, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		log.Fatalf("Error: %v", err)
+		fmt.Printf("Error: %v", err)
 	}
 	defer server.Close()
 
-	log.Printf("Stratum listening on %s", s.config.Stratum.Listen)
-	var accept = make(chan int, s.config.Stratum.MaxConn)
+	fmt.Printf("Stratum listening on %s", "0.0.0.0:8080")
+	var accept = make(chan int, 100)
 	n := 0
-
 	for {
 		conn, err := server.AcceptTCP()
 		if err != nil {
@@ -42,11 +56,6 @@ func (s *ProxyServer) ListenTCP() {
 		conn.SetKeepAlive(true)
 
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-
-		if s.policy.IsBanned(ip) || !s.policy.ApplyLimitPolicy(ip) {
-			conn.Close()
-			continue
-		}
 		n += 1
 		cs := &Session{conn: conn, ip: ip}
 
@@ -70,15 +79,14 @@ func (s *ProxyServer) handleTCPClient(cs *Session) error {
 	for {
 		data, isPrefix, err := connbuff.ReadLine()
 		if isPrefix {
-			log.Printf("Socket flood detected from %s", cs.ip)
-			s.policy.BanClient(cs.ip)
+			fmt.Printf("Socket flood detected from %s", cs.ip)
 			return err
 		} else if err == io.EOF {
-			log.Printf("Client %s disconnected", cs.ip)
+			fmt.Printf("Client %s disconnected", cs.ip)
 			s.removeSession(cs)
 			break
 		} else if err != nil {
-			// log.Printf("Error reading from socket: %v", err)
+			fmt.Printf("Error reading from socket: %v", err)
 			return err
 		}
 
@@ -86,8 +94,7 @@ func (s *ProxyServer) handleTCPClient(cs *Session) error {
 			var req StratumReq
 			err = json.Unmarshal(data, &req)
 			if err != nil {
-				s.policy.ApplyMalformedPolicy(cs.ip)
-				log.Printf("Malformed stratum request from %s: %v", cs.ip, err)
+				fmt.Printf("Malformed stratum request from %s: %v", cs.ip, err)
 				return err
 			}
 			s.setDeadline(cs.conn)
@@ -101,13 +108,18 @@ func (s *ProxyServer) handleTCPClient(cs *Session) error {
 }
 
 func (cs *Session) handleTCPMessage(s *ProxyServer, req *StratumReq) error {
+	fmt.Println("handleTCPMessage", req)
 	// Handle RPC methods
 	switch req.Method {
 	case "eth_submitLogin":
 		var params []string
-		err := json.Unmarshal(req.Params, &params)
+		mar, err := req.Params.MarshalJSON()
 		if err != nil {
-			log.Println("Malformed stratum request params from", cs.ip)
+			fmt.Println("handleTCPMessage MarshalJSON", err)
+		}
+		err = json.Unmarshal(mar, &params)
+		if err != nil {
+			fmt.Println("Malformed stratum request params from", cs.ip)
 			return err
 		}
 		reply, errReply := s.handleLoginRPC(cs, params, req.Worker)
@@ -123,9 +135,13 @@ func (cs *Session) handleTCPMessage(s *ProxyServer, req *StratumReq) error {
 		return cs.sendTCPResult(req.Id, &reply)
 	case "eth_submitWork":
 		var params []string
-		err := json.Unmarshal(req.Params, &params)
+		mar, err := req.Params.MarshalJSON()
 		if err != nil {
-			log.Println("Malformed stratum request params from", cs.ip)
+			fmt.Println("handleTCPMessage MarshalJSON", err)
+		}
+		err = json.Unmarshal(mar, &params)
+		if err != nil {
+			fmt.Println("Malformed stratum request params from", cs.ip)
 			return err
 		}
 		reply, errReply := s.handleTCPSubmitRPC(cs, req.Worker, params)
@@ -141,11 +157,11 @@ func (cs *Session) handleTCPMessage(s *ProxyServer, req *StratumReq) error {
 	}
 }
 
-func (cs *Session) sendTCPResult(id json.RawMessage, result interface{}) error {
+func (cs *Session) sendTCPResult(id *json.RawMessage, result interface{}) error {
 	cs.Lock()
 	defer cs.Unlock()
 
-	message := JSONRpcResp{Id: id, Version: "2.0", Error: nil, Result: result}
+	message := JSONResponse{Id: id, Version: "2.0", Error: nil, Result: result}
 	return cs.enc.Encode(&message)
 }
 
@@ -153,15 +169,15 @@ func (cs *Session) pushNewJob(result interface{}) error {
 	cs.Lock()
 	defer cs.Unlock()
 	// FIXME: Temporarily add ID for Claymore compliance
-	message := JSONPushMessage{Version: "2.0", Result: result, Id: 0}
+	message := JSONResponse{Id: &json.RawMessage{1}, Version: "2.0", Result: result}
 	return cs.enc.Encode(&message)
 }
 
-func (cs *Session) sendTCPError(id json.RawMessage, reply *ErrorReply) error {
+func (cs *Session) sendTCPError(id *json.RawMessage, reply *ErrorReply) error {
 	cs.Lock()
 	defer cs.Unlock()
 
-	message := JSONRpcResp{Id: id, Version: "2.0", Error: reply}
+	message := JSONResponse{Id: id, Version: "2.0", Error: reply}
 	err := cs.enc.Encode(&message)
 	if err != nil {
 		return err
@@ -170,7 +186,7 @@ func (cs *Session) sendTCPError(id json.RawMessage, reply *ErrorReply) error {
 }
 
 func (self *ProxyServer) setDeadline(conn *net.TCPConn) {
-	conn.SetDeadline(time.Now().Add(self.timeout))
+	conn.SetDeadline(time.Now().Add(time.Second * 10))
 }
 
 func (s *ProxyServer) registerSession(cs *Session) {
@@ -186,17 +202,13 @@ func (s *ProxyServer) removeSession(cs *Session) {
 }
 
 func (s *ProxyServer) broadcastNewJobs() {
-	t := s.currentBlockTemplate()
-	if t == nil || len(t.Header) == 0 || s.isSick() {
-		return
-	}
-	reply := []string{t.Header, t.Seed, s.diff}
+	reply := []string{"645cf20198c2f3861e947d4f67e3ab63b7b2e24dcc9095bd9123e7b33371f6cc", "abad8f99f3918bf903c6a909d9bbc0fdfa5a2f4b9cb1196175ec825c6610126c", "2000"}
 
 	s.sessionsMu.RLock()
 	defer s.sessionsMu.RUnlock()
 
 	count := len(s.sessions)
-	log.Printf("Broadcasting new job to %v stratum miners", count)
+	fmt.Printf("Broadcasting new job to %v stratum miners", count)
 
 	start := time.Now()
 	bcast := make(chan int, 1024)
@@ -210,12 +222,12 @@ func (s *ProxyServer) broadcastNewJobs() {
 			err := cs.pushNewJob(&reply)
 			<-bcast
 			if err != nil {
-				log.Printf("Job transmit error to %v@%v: %v", cs.login, cs.ip, err)
+				fmt.Printf("Job transmit error to %v@%v: %v", cs.login, cs.ip, err)
 				s.removeSession(cs)
 			} else {
 				s.setDeadline(cs.conn)
 			}
 		}(m)
 	}
-	log.Printf("Jobs broadcast finished %s", time.Since(start))
+	fmt.Printf("Jobs broadcast finished %s", time.Since(start))
 }

@@ -1,20 +1,9 @@
 package main
 
 import (
-	"log"
-	"math/rand"
-
-	"runtime"
-	"time"
-	"xlog"
-	"proxy"
-	"storage"
-	"util"
+	proxy "github.com/lzxm160/ethpoolmock/src"
 )
 
-var cfg proxy.ProxyConf
 func main() {
-	s := proxy.NewProxy(&cfg, nil)
-	s.Start()
-	select{}
+	proxy.NewProxy()
 }
