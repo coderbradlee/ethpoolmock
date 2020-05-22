@@ -14,7 +14,7 @@ func (s *ProxyServer) handleLoginRPC(cs *Session, params []string, id string) (b
 	login := strings.ToLower(params[0])
 	cs.login = login
 	s.registerSession(cs)
-	fmt.Printf("Stratum miner connected %v@%v", login, cs.ip)
+	fmt.Printf("Stratum miner connected %s@%s\n", login, cs.ip)
 	return true, nil
 }
 
@@ -39,6 +39,6 @@ func (s *ProxyServer) handleSubmitRPC(cs *Session, login, id string, params []st
 }
 
 func (s *ProxyServer) handleUnknownRPC(cs *Session, m string) *ErrorReply {
-	fmt.Printf("Unknown request method %s from %s", m, cs.ip)
+	fmt.Printf("Unknown request method %s from %s\n", m, cs.ip)
 	return &ErrorReply{Code: -3, Message: "Method not found"}
 }
