@@ -19,7 +19,7 @@ func (s *ProxyServer) handleLoginRPC(cs *Session, params []string, id string) (b
 }
 
 func (s *ProxyServer) handleGetWorkRPC(cs *Session) ([]string, *ErrorReply) {
-	return []string{seedHash, headerHash, diff}, nil
+	return []string{headerHash, seedHash, diff}, nil
 }
 
 // Stratum

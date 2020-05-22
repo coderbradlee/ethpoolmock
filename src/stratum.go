@@ -193,7 +193,7 @@ func (cs *Session) sendTCPError(id *json.RawMessage, reply *ErrorReply) error {
 }
 
 func (self *ProxyServer) setDeadline(conn *net.TCPConn) {
-	conn.SetDeadline(time.Now().Add(time.Second * 10))
+	conn.SetDeadline(time.Now().Add(time.Second * 1000))
 }
 
 func (s *ProxyServer) registerSession(cs *Session) {
@@ -209,7 +209,7 @@ func (s *ProxyServer) removeSession(cs *Session) {
 }
 
 func (s *ProxyServer) broadcastNewJobs() {
-	reply := []string{seedHash, headerHash, diff}
+	reply := []string{headerHash, seedHash, diff}
 
 	s.sessionsMu.RLock()
 	defer s.sessionsMu.RUnlock()
