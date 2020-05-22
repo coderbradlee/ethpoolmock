@@ -168,7 +168,7 @@ func (cs *Session) sendTCPResult(id *json.RawMessage, result interface{}) error 
 	defer cs.Unlock()
 
 	message := JSONResponse{Id: id, Version: "2.0", Error: nil, Result: result}
-	fmt.Println("response:", message)
+	fmt.Println("response:", message.String())
 	return cs.enc.Encode(&message)
 }
 
