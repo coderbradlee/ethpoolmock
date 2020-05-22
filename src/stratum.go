@@ -37,11 +37,11 @@ func NewProxy() {
 func (s *ProxyServer) ListenTCP() {
 	addr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:8080")
 	if err != nil {
-		fmt.Printf("Error: %v", err)
+		fmt.Printf("Error: %v\n", err)
 	}
 	server, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		fmt.Printf("Error: %v", err)
+		fmt.Printf("Error: %v\n", err)
 	}
 	defer server.Close()
 
@@ -80,14 +80,14 @@ func (s *ProxyServer) handleTCPClient(cs *Session) error {
 	for {
 		data, isPrefix, err := connbuff.ReadLine()
 		if isPrefix {
-			fmt.Printf("Socket flood detected from %s", cs.ip)
+			fmt.Printf("Socket flood detected from %s\n", cs.ip)
 			return err
 		} else if err == io.EOF {
-			fmt.Printf("Client %s disconnected", cs.ip)
+			fmt.Printf("Client %s disconnected\n", cs.ip)
 			s.removeSession(cs)
 			break
 		} else if err != nil {
-			fmt.Printf("Error reading from socket: %v", err)
+			fmt.Printf("Error reading from socket: %v\n", err)
 			return err
 		}
 
@@ -95,7 +95,7 @@ func (s *ProxyServer) handleTCPClient(cs *Session) error {
 			var req StratumReq
 			err = json.Unmarshal(data, &req)
 			if err != nil {
-				fmt.Printf("Malformed stratum request from %s: %v", cs.ip, err)
+				fmt.Printf("Malformed stratum request from %s: %v\n", cs.ip, err)
 				return err
 			}
 			s.setDeadline(cs.conn)
@@ -212,7 +212,7 @@ func (s *ProxyServer) broadcastNewJobs() {
 	defer s.sessionsMu.RUnlock()
 
 	count := len(s.sessions)
-	fmt.Printf("Broadcasting new job to %v stratum miners", count)
+	fmt.Printf("Broadcasting new job to %v stratum miners\n", count)
 
 	start := time.Now()
 	bcast := make(chan int, 1024)
@@ -226,12 +226,12 @@ func (s *ProxyServer) broadcastNewJobs() {
 			err := cs.pushNewJob(&reply)
 			<-bcast
 			if err != nil {
-				fmt.Printf("Job transmit error to %v@%v: %v", cs.login, cs.ip, err)
+				fmt.Printf("Job transmit error to %v@%v: %v\n", cs.login, cs.ip, err)
 				s.removeSession(cs)
 			} else {
 				s.setDeadline(cs.conn)
 			}
 		}(m)
 	}
-	fmt.Printf("Jobs broadcast finished %s", time.Since(start))
+	fmt.Printf("Jobs broadcast finished %s\n", time.Since(start))
 }
