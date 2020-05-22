@@ -154,7 +154,7 @@ func (cs *Session) handleTCPMessage(s *ProxyServer, req *StratumReq) error {
 		if errReply != nil {
 			return cs.sendTCPError(req.Id, errReply)
 		}
-		return cs.sendTCPResult(req.Id, &reply)
+		return cs.sendTCPResult(req.Id, reply)
 	case "eth_submitHashrate":
 		return cs.sendTCPResult(req.Id, true)
 	default:
