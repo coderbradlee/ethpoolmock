@@ -45,7 +45,7 @@ func (s *ProxyServer) ListenTCP() {
 	}
 	defer server.Close()
 
-	fmt.Printf("Stratum listening on %s", "0.0.0.0:8080")
+	fmt.Println("Stratum listening on 0.0.0.0:8080")
 	var accept = make(chan int, 100)
 	n := 0
 	for {
@@ -53,6 +53,7 @@ func (s *ProxyServer) ListenTCP() {
 		if err != nil {
 			continue
 		}
+		fmt.Println("have conn", conn)
 		conn.SetKeepAlive(true)
 
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
