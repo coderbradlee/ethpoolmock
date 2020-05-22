@@ -109,7 +109,7 @@ func (s *ProxyServer) handleTCPClient(cs *Session) error {
 }
 
 func (cs *Session) handleTCPMessage(s *ProxyServer, req *StratumReq) error {
-	fmt.Println("handleTCPMessage", req)
+	fmt.Println("handleTCPMessage request:", req)
 	// Handle RPC methods
 	switch req.Method {
 	case "eth_submitLogin":
@@ -127,6 +127,7 @@ func (cs *Session) handleTCPMessage(s *ProxyServer, req *StratumReq) error {
 		if errReply != nil {
 			return cs.sendTCPError(req.Id, errReply)
 		}
+
 		return cs.sendTCPResult(req.Id, reply)
 	case "eth_getWork":
 		reply, errReply := s.handleGetWorkRPC(cs)
@@ -163,6 +164,7 @@ func (cs *Session) sendTCPResult(id *json.RawMessage, result interface{}) error 
 	defer cs.Unlock()
 
 	message := JSONResponse{Id: id, Version: "2.0", Error: nil, Result: result}
+	fmt.Println("response:", message)
 	return cs.enc.Encode(&message)
 }
 
@@ -171,6 +173,7 @@ func (cs *Session) pushNewJob(result interface{}) error {
 	defer cs.Unlock()
 	// FIXME: Temporarily add ID for Claymore compliance
 	message := JSONResponse{Id: &json.RawMessage{1}, Version: "2.0", Result: result}
+	fmt.Println("pushNewJob:", message)
 	return cs.enc.Encode(&message)
 }
 
