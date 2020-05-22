@@ -43,7 +43,7 @@ func (s *JSONResponse) String() string {
 		return ""
 	}
 	id := string(m)
-	return fmt.Sprintf(`{"id": %s,"version": %s,"result": %s,"error": %s}`, id, s.Version, s.Result, s.Error)
+	return fmt.Sprintf(`{"id": %s,"version": %s,"result": %v,"error": %s}`, id, s.Version, s.Result, s.Error)
 }
 
 type ErrorReply struct {
